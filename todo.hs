@@ -15,33 +15,28 @@ import ToText
 instance (ToText a, ToText b) => ToText ((:*:) a b) where
     toText ((:*:) a b) = T.concat [toText a, " :*: ", toText b]
 
-data Pet = Dog | Horse | Dragon
-  deriving (Show, Read, Bounded, Enum)
-instance SqlType Pet
-instance ToText Pet where
-    toText = T.pack . show
+data TodoEntry = TodoEntry { num :: Int, description :: Text }
+    deriving Generic
+instance SqlRow TodoEntry
+instance ToText TodoEntry where
+    toText a = T.concat [toText $ num a, " : ", description a]
 
-data Person = Person
-  { name :: Text
-  , age  :: Int
-  , pet  :: Maybe Pet
-  } deriving Generic
-instance SqlRow Person
-
-people :: Table Person
-people = table "people1" [#name :- primary]
+todoTable :: Table TodoEntry
+todoTable = table "todo" [#num :- primary]
 
 main :: IO ()
 main = withPostgreSQL ("todoplay" `on` "base.home" ) $ do
-  --createTable people
-  --insert_ people
-  --  [ Person "Петя"    19 (Just Dog)
-  --  , Person "Женя" 23 (Just Dragon)
-  --  , Person "Света"      10 Nothing
-  --  ]
+  tryCreateTable todoTable
 
-  adultsAndTheirPets <- query $ do
-    person <- select people
-    restrict (person ! #age .>= 18)
-    return (person ! #name :*: person ! #pet)
-  liftIO $ TIO.putStrLn $ toText adultsAndTheirPets
+  --insert_ todoTable
+  --    [ TodoEntry 1 "Вымыть пол"
+  --    , TodoEntry 2 "Всё убрать"
+  --    , TodoEntry 3 "Сделать всё"
+  --    ]
+
+  todoList <- query $ do
+    entry <- select todoTable
+    return (entry ! #num :*: entry ! #description)
+
+  liftIO $ TIO.putStrLn $ T.intercalate "\n" $ map toText todoList
+

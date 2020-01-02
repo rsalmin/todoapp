@@ -12,6 +12,9 @@ class ToText a where
 instance ToText Text where
     toText = id
 
+instance  ToText Int where
+    toText a = T.pack $ show a
+
 instance (ToText a) => ToText [a] where
     toText xs = T.intercalate " " $ map toText xs
 
