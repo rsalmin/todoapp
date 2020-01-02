@@ -5,24 +5,40 @@ module CmdArgs
 where
 import Data.Text (Text)
 import qualified Data.Text as T
-
+import Control.Monad.Except
 import ToText
 
-data Command = Add | Unknown Text
+data Command = Empty | Add
 
 instance ToText Command where
+   toText Empty = "Empty"
    toText Add = "Add"
-   toText (Unknown txt) = T.append "Unknown: "  txt
 
-data Args = Args { cmd::Command, args::[Text] }
+data Request = Request { cmd::Command, cmdArgs::[Text] }
 
-instance ToText Args where
-   toText a = T.append ( toText $ cmd a) $ toText (args a)
+instance ToText Request where
+   toText a = T.append ( toText $ cmd a) $ toText (cmdArgs a)
 
-parseArgs::[String] -> Args
-parseArgs [] = Args (Unknown "") []
-parseArgs (x:xs) = Args (parseCommand x) (map T.pack xs)
+data CmdError = EmptyInput | UnknownCommand Text | OtherError Text
 
-parseCommand::String -> Command
-parseCommand ['a'] = Add
-parseCommand xs = Unknown $ T.pack xs
+instance ToText CmdError where
+    toText EmptyInput = "Input is Empty"
+    toText (UnknownCommand txt) = T.append "Unknown Command : " txt
+    toText (OtherError txt) = T.append "CmdError : " txt
+
+type CmdErrorMonad = Either CmdError
+
+
+parseArgs::[String] -> CmdErrorMonad Request
+parseArgs [] = throwError EmptyInput
+parseArgs (x:xs) = parseCommand x >>=
+   \cmd -> case cmd of
+        Add -> if null xs
+                         then throwError $ OtherError "No description for Add command"
+                         else return $ Request Add $ map T.pack xs
+        otherwise -> throwError $ OtherError "Command exists but unhandled... WTF?"
+
+
+parseCommand::String -> CmdErrorMonad Command
+parseCommand ['a'] = return Add
+parseCommand xs = throwError $ UnknownCommand $ T.pack xs

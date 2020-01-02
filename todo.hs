@@ -1,8 +1,10 @@
-{-# LANGUAGE NoImplicitPrelude, DeriveGeneric, OverloadedStrings, OverloadedLabels, DeriveDataTypeable, TemplateHaskell#-}
+{-# LANGUAGE NoImplicitPrelude, DeriveGeneric, OverloadedStrings, OverloadedLabels, DeriveDataTypeable,  OverloadedStrings#-}
 
 import BasePrelude hiding (on)
 import Database.Selda hiding (def, toText)
 import Database.Selda.PostgreSQL
+
+import Control.Monad.Except
 
 import CmdArgs
 import System.Environment
@@ -24,8 +26,8 @@ instance ToText TodoEntry where
 todoTable :: Table TodoEntry
 todoTable = table "todo" [#num :- primary]
 
-main :: IO ()
-main = withPostgreSQL ("todoplay" `on` "base.home" ) $ do
+
+queryTable =  withPostgreSQL ("todoplay" `on` "base.home" ) $ do
   tryCreateTable todoTable
 
   --insert_ todoTable
@@ -39,4 +41,17 @@ main = withPostgreSQL ("todoplay" `on` "base.home" ) $ do
     return (entry ! #num :*: entry ! #description)
 
   liftIO $ TIO.putStrLn $ T.intercalate "\n" $ map toText todoList
+
+
+main :: IO ()
+main = do
+    args <- getArgs
+    req <- case (parseArgs args) of
+        Left err -> (TIO.putStrLn $ toText err) >> (return $ Request Empty [])
+        Right r -> return r
+    case (cmd req) of
+        Empty -> queryTable
+        Add -> TIO.putStrLn $ T.append "request to add " (T.concat $ cmdArgs req)
+
+
 
