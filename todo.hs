@@ -44,19 +44,20 @@ queryTable =  withDB $ do
 --TODO check success
 insertEntry dscr = withDB $ insert_ todoTable [ TodoEntry def dscr ]
 
---delEntry n = withDB $ do
---    deleteFrom_ todoTable (\entry -> entry ! #num .== (fromInt $ int n))
+delEntry ns = withDB $ forM_ ns $
+    \n -> deleteFrom_ todoTable (\entry -> entry ! #num .== (literal $ toId n))
 
 main :: IO ()
 main = do
     args <- getArgs
     req <- case (parseArgs args) of
-        Left err -> (TIO.putStrLn $ toText err) >> (return $ Request Empty [])
+        Left err -> (TIO.putStrLn $ toText err) >> (return Empty)
         Right r -> return r
     ensureTable
-    case (cmd req) of
+    case req of
         Empty -> queryTable
-        Add -> insertEntry $ T.intercalate " " $ cmdArgs req
+        Add dscr -> insertEntry dscr
+        Del  ns -> delEntry ns
 
 
 

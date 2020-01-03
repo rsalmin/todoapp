@@ -7,17 +7,15 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Control.Monad.Except
 import ToText
+import Data.Maybe
+import Text.Read (readMaybe)
 
-data Command = Empty | Add
-
-instance ToText Command where
-   toText Empty = "Empty"
-   toText Add = "Add"
-
-data Request = Request { cmd::Command, cmdArgs::[Text] }
+data Request = Empty | Add Text | Del [Int]
 
 instance ToText Request where
-   toText a = T.append ( toText $ cmd a) $ toText (cmdArgs a)
+   toText Empty = "Empty"
+   toText (Add txt) = T.append "Add " txt
+   toText (Del ns) = T.append "Del " $ T.intercalate " " $ map toText ns
 
 data CmdError = EmptyInput | UnknownCommand Text | OtherError Text
 
@@ -31,14 +29,14 @@ type CmdErrorMonad = Either CmdError
 
 parseArgs::[String] -> CmdErrorMonad Request
 parseArgs [] = throwError EmptyInput
-parseArgs (x:xs) = parseCommand x >>=
-   \cmd -> case cmd of
-        Add -> if null xs
+parseArgs (x:xs) =
+   case x of
+        ['a'] -> if null xs
                          then throwError $ OtherError "No description for Add command"
-                         else return $ Request Add $ map T.pack xs
-        otherwise -> throwError $ OtherError "Command exists but unhandled... WTF?"
-
-
-parseCommand::String -> CmdErrorMonad Command
-parseCommand ['a'] = return Add
-parseCommand xs = throwError $ UnknownCommand $ T.pack xs
+                         else return $ Add $ T.intercalate " " $ map T.pack xs
+        ['d'] -> if null ints
+                         then throwError $ OtherError "No valid id's  for Del command"
+                         else return $ Del ints
+        otherwise -> throwError $ UnknownCommand $ T.pack x
+    where
+        ints = catMaybes $ map readMaybe xs
