@@ -10,11 +10,12 @@ import ToText
 import Data.Maybe
 import Text.Read (readMaybe)
 
-data Request = Empty | Add Text | Del [Int]
+data Request = Empty | Add (Maybe Int) Text | Del [Int]
 
 instance ToText Request where
    toText Empty = "Empty"
-   toText (Add txt) = T.append "Add " txt
+   toText (Add Nothing txt) = T.append "Add " txt
+   toText (Add (Just n) txt)  = T.concat ["Add ", toText n, " ", txt]
    toText (Del ns) = T.append "Del " $ T.intercalate " " $ map toText ns
 
 data CmdError = EmptyInput | UnknownCommand Text | OtherError Text
@@ -26,14 +27,19 @@ instance ToText CmdError where
 
 type CmdErrorMonad = Either CmdError
 
+parseAddCmd::[String] -> CmdErrorMonad Request
+parseAddCmd [] = throwError $ OtherError "No description for Add command"
+parseAddCmd lst@(x:xs) =
+    case readMaybe x of
+        Nothing -> return $ Add Nothing $ T.intercalate " " $ map T.pack lst
+        Just n     -> return $ Add (Just n)  $ T.intercalate " " $ map T.pack xs
+
 
 parseArgs::[String] -> CmdErrorMonad Request
-parseArgs [] = throwError EmptyInput
+parseArgs [] = return Empty
 parseArgs (x:xs) =
    case x of
-        ['a'] -> if null xs
-                         then throwError $ OtherError "No description for Add command"
-                         else return $ Add $ T.intercalate " " $ map T.pack xs
+        ['a'] -> parseAddCmd xs
         ['d'] -> if null ints
                          then throwError $ OtherError "No valid id's  for Del command"
                          else return $ Del ints

@@ -17,6 +17,8 @@ import ToText
 instance (ToText a, ToText b) => ToText ((:*:) a b) where
     toText ((:*:) a b) = T.concat [toText a, " :*: ", toText b]
 
+
+
 data TodoEntry = TodoEntry { num :: ID TodoEntry, description :: Text }
     deriving Generic
 instance SqlRow TodoEntry
@@ -30,19 +32,39 @@ todoTable :: Table TodoEntry
 todoTable = table "todo" [#num :- autoPrimary ]
 
 
+data ParentChildEntry = ParentChildEntry { parent :: ID TodoEntry, child :: ID TodoEntry }
+    deriving Generic
+instance SqlRow ParentChildEntry
+instance ToText ParentChildEntry where
+   toText p = T.concat [toText $ parent p, "->", toText $ child p]
+
+pchTable :: Table ParentChildEntry
+pchTable = table "parentchild" []
+
 withDB = withPostgreSQL ("todoplay" `on` "base.home" )
 
-ensureTable = withDB $ tryCreateTable todoTable
+ensureTables = withDB $ do
+    tryCreateTable todoTable
+    tryCreateTable pchTable
 
 queryTable =  withDB $ do
   todoList <- query $ do
     entry <- select todoTable
     return (entry ! #num :*: entry ! #description)
+  links <- query $ do
+    entry <- select pchTable
+    return (entry ! #parent :*: entry ! #child)
 
   liftIO $ TIO.putStrLn $ T.intercalate "\n" $ map toText todoList
+  liftIO $ TIO.putStrLn "------------------------------------------------"
+  liftIO $ TIO.putStrLn $ T.intercalate "\n" $ map toText links
 
 --TODO check success
-insertEntry dscr = withDB $ insert_ todoTable [ TodoEntry def dscr ]
+insertEntry prnt dscr = withDB $ do
+    pk <- insertWithPK todoTable [ TodoEntry def dscr ]
+    case prnt of
+        Nothing -> return ()
+        Just n   -> insert_ pchTable [ ParentChildEntry (toId n) pk ]
 
 delEntry ns = withDB $ forM_ ns $
     \n -> deleteFrom_ todoTable (\entry -> entry ! #num .== (literal $ toId n))
@@ -53,11 +75,13 @@ main = do
     req <- case (parseArgs args) of
         Left err -> (TIO.putStrLn $ toText err) >> (return Empty)
         Right r -> return r
-    ensureTable
+    ensureTables
     case req of
-        Empty -> queryTable
-        Add dscr -> insertEntry dscr
+        Empty -> return ()
+        Add prnt dscr -> insertEntry prnt dscr
         Del  ns -> delEntry ns
+
+    queryTable
 
 
 
