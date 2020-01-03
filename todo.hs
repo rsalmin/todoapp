@@ -1,7 +1,7 @@
-{-# LANGUAGE NoImplicitPrelude, DeriveGeneric, OverloadedStrings, OverloadedLabels, DeriveDataTypeable,  OverloadedStrings#-}
+{-# LANGUAGE NoImplicitPrelude, DeriveGeneric, OverloadedStrings, OverloadedLabels, DeriveDataTypeable,  OverloadedStrings, FlexibleInstances#-}
 
 import BasePrelude hiding (on)
-import Database.Selda hiding (def, toText)
+import Database.Selda hiding (toText)
 import Database.Selda.PostgreSQL
 
 import Control.Monad.Except
@@ -17,31 +17,35 @@ import ToText
 instance (ToText a, ToText b) => ToText ((:*:) a b) where
     toText ((:*:) a b) = T.concat [toText a, " :*: ", toText b]
 
-data TodoEntry = TodoEntry { num :: Int, description :: Text }
+data TodoEntry = TodoEntry { num :: ID TodoEntry, description :: Text }
     deriving Generic
 instance SqlRow TodoEntry
+
+instance ToText (ID TodoEntry) where
+    toText  = toText . fromId
 instance ToText TodoEntry where
     toText a = T.concat [toText $ num a, " : ", description a]
 
 todoTable :: Table TodoEntry
-todoTable = table "todo" [#num :- primary]
+todoTable = table "todo" [#num :- autoPrimary ]
 
 
-queryTable =  withPostgreSQL ("todoplay" `on` "base.home" ) $ do
-  tryCreateTable todoTable
+withDB = withPostgreSQL ("todoplay" `on` "base.home" )
 
-  --insert_ todoTable
-  --    [ TodoEntry 1 "Вымыть пол"
-  --    , TodoEntry 2 "Всё убрать"
-  --    , TodoEntry 3 "Сделать всё"
-  --    ]
+ensureTable = withDB $ tryCreateTable todoTable
 
+queryTable =  withDB $ do
   todoList <- query $ do
     entry <- select todoTable
     return (entry ! #num :*: entry ! #description)
 
   liftIO $ TIO.putStrLn $ T.intercalate "\n" $ map toText todoList
 
+--TODO check success
+insertEntry dscr = withDB $ insert_ todoTable [ TodoEntry def dscr ]
+
+--delEntry n = withDB $ do
+--    deleteFrom_ todoTable (\entry -> entry ! #num .== (fromInt $ int n))
 
 main :: IO ()
 main = do
@@ -49,9 +53,10 @@ main = do
     req <- case (parseArgs args) of
         Left err -> (TIO.putStrLn $ toText err) >> (return $ Request Empty [])
         Right r -> return r
+    ensureTable
     case (cmd req) of
         Empty -> queryTable
-        Add -> TIO.putStrLn $ T.append "request to add " (T.concat $ cmdArgs req)
+        Add -> insertEntry $ T.intercalate " " $ cmdArgs req
 
 
 
