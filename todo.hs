@@ -88,7 +88,10 @@ insertEntry prnt dscr = withDB $ do
 
 
 delEntry ns = withDB $ forM_ ns $
-    \n -> deleteFrom_ todoTable (\entry -> entry ! #num .== (literal $ toId n))
+    \n -> let nID = literal $ toId n in
+             do
+               deleteFrom_ todoTable (\entry -> entry ! #num .== nID)
+               deleteFrom_ pchTable (\entry -> entry ! #parent .== nID .|| entry ! #child .== nID)
 
 
 seldaErrorHandler :: SeldaError -> IO ()
