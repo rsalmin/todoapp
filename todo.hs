@@ -14,6 +14,16 @@ import qualified Data.Text.IO as TIO
 
 import ToText
 
+data TodoError = TodoError Text
+    deriving Show
+
+instance ToText TodoError where
+    toText (TodoError txt) = T.append "Error: " txt
+
+instance Exception TodoError
+
+
+
 instance (ToText a, ToText b) => ToText ((:*:) a b) where
     toText ((:*:) a b) = T.concat [toText a, " :*: ", toText b]
 
@@ -59,18 +69,41 @@ queryTable =  withDB $ do
   liftIO $ TIO.putStrLn "------------------------------------------------"
   liftIO $ TIO.putStrLn $ T.intercalate "\n" $ map toText links
 
+
+checkPK pk = do
+    nIDs <- query $ aggregate $ do
+        entries <- select todoTable
+        restrict ( entries ! #num .== literal pk)
+        return (count $ entries ! #num)
+    case nIDs of
+        [1] -> return ()
+        otherwise -> throw $ TodoError $ T.append "No task with ID " (toText pk)
+
 --TODO check success
 insertEntry prnt dscr = withDB $ do
-    pk <- insertWithPK todoTable [ TodoEntry def dscr ]
     case prnt of
-        Nothing -> return ()
-        Just n   -> insert_ pchTable [ ParentChildEntry (toId n) pk ]
+        Nothing -> insert_ todoTable [ TodoEntry def dscr ]
+        Just n   -> do
+                              checkPK (toId n)
+                              newPK <- insertWithPK todoTable [ TodoEntry def dscr ]
+                              insert_ pchTable [ ParentChildEntry (toId n) newPK ]
+
 
 delEntry ns = withDB $ forM_ ns $
     \n -> deleteFrom_ todoTable (\entry -> entry ! #num .== (literal $ toId n))
 
-main :: IO ()
-main = do
+
+
+seldaErrorHandler :: SeldaError -> IO ()
+seldaErrorHandler  = print
+
+todoErrorHandler :: TodoError -> IO ()
+todoErrorHandler  = TIO.putStrLn . toText
+
+main = main1 `catches` [Handler seldaErrorHandler, Handler todoErrorHandler]
+
+main1 :: IO ()
+main1 = do
     args <- getArgs
     req <- case (parseArgs args) of
         Left err -> (TIO.putStrLn $ toText err) >> (return Empty)
