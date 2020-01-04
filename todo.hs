@@ -7,6 +7,7 @@ import Database.Selda.PostgreSQL
 import Control.Monad.Except
 
 import CmdArgs
+import Print
 import System.Environment
 
 import qualified Data.Text as T
@@ -65,10 +66,7 @@ queryTable =  withDB $ do
     entry <- select pchTable
     return (entry ! #parent :*: entry ! #child)
 
-  liftIO $ TIO.putStrLn $ T.intercalate "\n" $ map toText todoList
-  liftIO $ TIO.putStrLn "------------------------------------------------"
-  liftIO $ TIO.putStrLn $ T.intercalate "\n" $ map toText links
-
+  liftIO $ TIO.putStrLn $ showToDo todoList links
 
 checkPK pk = do
     nIDs <- query $ aggregate $ do
@@ -91,7 +89,6 @@ insertEntry prnt dscr = withDB $ do
 
 delEntry ns = withDB $ forM_ ns $
     \n -> deleteFrom_ todoTable (\entry -> entry ! #num .== (literal $ toId n))
-
 
 
 seldaErrorHandler :: SeldaError -> IO ()

@@ -2,7 +2,7 @@
 
 All: todo done
 
-todo: todo.hs CmdArgs.hs ToText.hs
+todo: todo.hs CmdArgs.hs ToText.hs Print.hs
 	ghc $^
 
 done:
