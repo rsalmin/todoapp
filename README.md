@@ -11,7 +11,11 @@ to list entries:
 
 to add entry:
 
-  `./todo a Entry Descripltion spaces are not problem`
+  `./todo a Description of task spaces are not problem`
+
+to add subentry (subtask) put parent ID after `a`:
+
+  `./todo a ParentID Description of subtask`
 
 to del entries (5 and 6 in this example)
 
