@@ -6,24 +6,27 @@ where
 import Data.Text (Text)
 import qualified Data.Text as T
 import Control.Monad.Except
-import ToText
+import PutText
 import Data.Maybe
 import Text.Read (readMaybe)
 
-data Request = Empty | Add (Maybe Int) Text | Del [Int]
+import Data.Time
 
-instance ToText Request where
-   toText Empty = "Empty"
-   toText (Add Nothing txt) = T.append "Add " txt
-   toText (Add (Just n) txt)  = T.concat ["Add ", toText n, " ", txt]
-   toText (Del ns) = T.append "Del " $ T.intercalate " " $ map toText ns
+data Request = Empty | Add (Maybe Int) Text | Del [Int] | Shedule Int (Maybe UTCTime) (Maybe UTCTime)
+
+instance PutText Request where
+   putText Empty = putText ("Empty"::Text)
+   putText (Add Nothing txt) = mapM_ putText ["Add ",  txt]
+   putText (Add (Just n) txt)  = putText ("Add "::Text) >> putText  n >> putSpace >> putText  txt
+   putText (Del ns) = putText ("Del "::Text) >> ( sequence_ $ intercalateM putSpace $ map putText ns )
+   putText (Shedule n start stop) = sequence_ [putText ("Shedule "::Text), putText n, putText start, putText stop]
 
 data CmdError = EmptyInput | UnknownCommand Text | OtherError Text
 
-instance ToText CmdError where
-    toText EmptyInput = "Input is Empty"
-    toText (UnknownCommand txt) = T.append "Unknown Command : " txt
-    toText (OtherError txt) = T.append "CmdError : " txt
+instance PutText CmdError where
+    putText EmptyInput = putText ("Input is Empty"::Text)
+    putText (UnknownCommand txt) = mapM_ putText ["Unknown Command : ", txt]
+    putText (OtherError txt) = mapM_ putText ["CmdError : ", txt]
 
 type CmdErrorMonad = Either CmdError
 

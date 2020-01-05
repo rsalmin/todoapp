@@ -13,20 +13,21 @@ import System.Environment
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 
-import ToText
+import PutText
 
-data TodoError = TodoError Text
-    deriving Show
+data TodoError = TodoError (IO ())
+instance Show TodoError where
+    show e = "Todo Error Can't be shown outside of IO monad, but where it is?"
 
-instance ToText TodoError where
-    toText (TodoError txt) = T.append "Error: " txt
+instance PutText TodoError where
+    putText (TodoError m) = putText ("Error: "::Text) >> m
 
 instance Exception TodoError
 
 
 
-instance (ToText a, ToText b) => ToText ((:*:) a b) where
-    toText ((:*:) a b) = T.concat [toText a, " :*: ", toText b]
+instance (PutText a, PutText b) => PutText ((:*:) a b) where
+    putText ((:*:) a b) = sequence_ [putText a, putText (" :*: "::Text), putText b]
 
 
 
@@ -35,10 +36,10 @@ data TodoEntry = TodoEntry { num :: ID TodoEntry, description :: Text,
     deriving Generic
 instance SqlRow TodoEntry
 
-instance ToText (ID TodoEntry) where
-    toText  = toText . fromId
-instance ToText TodoEntry where
-    toText a = T.concat [toText $ num a, " : ", description a]
+instance PutText (ID TodoEntry) where
+    putText  = putText . fromId
+instance PutText TodoEntry where
+    putText a = sequence_ [putText $ num a, putText (" : "::Text), putText $ description a]
 
 todoTable :: Table TodoEntry
 todoTable = table "todo" [#num :- autoPrimary ]
@@ -47,8 +48,8 @@ todoTable = table "todo" [#num :- autoPrimary ]
 data ParentChildEntry = ParentChildEntry { parent :: ID TodoEntry, child :: ID TodoEntry }
     deriving Generic
 instance SqlRow ParentChildEntry
-instance ToText ParentChildEntry where
-   toText p = T.concat [toText $ parent p, "->", toText $ child p]
+instance PutText ParentChildEntry where
+   putText p = sequence_ [putText $ parent p, putText ("->"::Text), putText $ child p]
 
 pchTable :: Table ParentChildEntry
 pchTable = table "parentchild" []
@@ -76,7 +77,7 @@ checkPK pk = do
         return (count $ entries ! #num)
     case nIDs of
         [1] -> return ()
-        otherwise -> throw $ TodoError $ T.append "No task with ID " (toText pk)
+        otherwise -> throw $ TodoError $ putText ("No task with ID "::Text) >> (putText pk)
 
 --TODO check success
 insertEntry prnt dscr = withDB $ do
@@ -99,7 +100,7 @@ seldaErrorHandler :: SeldaError -> IO ()
 seldaErrorHandler  = print
 
 todoErrorHandler :: TodoError -> IO ()
-todoErrorHandler  = TIO.putStrLn . toText
+todoErrorHandler  (TodoError m) = m
 
 main = main1 `catches` [Handler seldaErrorHandler, Handler todoErrorHandler]
 
@@ -107,7 +108,7 @@ main1 :: IO ()
 main1 = do
     args <- getArgs
     req <- case (parseArgs args) of
-        Left err -> (TIO.putStrLn $ toText err) >> (return Empty)
+        Left err -> (putText err) >> (return Empty)
         Right r -> return r
     ensureTables
     case req of
