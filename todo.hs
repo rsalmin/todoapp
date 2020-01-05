@@ -30,7 +30,8 @@ instance (ToText a, ToText b) => ToText ((:*:) a b) where
 
 
 
-data TodoEntry = TodoEntry { num :: ID TodoEntry, description :: Text }
+data TodoEntry = TodoEntry { num :: ID TodoEntry, description :: Text,
+                                                    startShedule :: Maybe UTCTime, endShedule :: Maybe UTCTime}
     deriving Generic
 instance SqlRow TodoEntry
 
@@ -80,10 +81,10 @@ checkPK pk = do
 --TODO check success
 insertEntry prnt dscr = withDB $ do
     case prnt of
-        Nothing -> insert_ todoTable [ TodoEntry def dscr ]
+        Nothing -> insert_ todoTable [ TodoEntry def dscr Nothing Nothing]
         Just n   -> do
                               checkPK (toId n)
-                              newPK <- insertWithPK todoTable [ TodoEntry def dscr ]
+                              newPK <- insertWithPK todoTable [ TodoEntry def dscr Nothing Nothing]
                               insert_ pchTable [ ParentChildEntry (toId n) newPK ]
 
 
