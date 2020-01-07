@@ -1,8 +1,9 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude, OverloadedStrings #-}
 module CmdArgs
 
 
 where
+import BasicPrelude
 import Data.Text (Text)
 import qualified Data.Text as T
 import Control.Monad.Except
@@ -11,6 +12,10 @@ import Data.Maybe
 import Text.Read (readMaybe)
 
 import Data.Time
+
+import Text.Parsec.Text
+import Text.Parsec hiding (Empty)
+import Text.Parsec.Error (errorMessages, messageString)
 
 data Request = Empty | Add (Maybe Int) Text | Del [Int] | Shedule Int (Maybe UTCTime) (Maybe UTCTime)
 
@@ -21,31 +26,35 @@ instance PutText Request where
    putText (Del ns) = putText ("Del "::Text) >> ( sequence_ $ intercalateM putSpace $ map putText ns )
    putText (Shedule n start stop) = sequence_ [putText ("Shedule "::Text), putText n, putText start, putText stop]
 
-data CmdError = EmptyInput | UnknownCommand Text | OtherError Text
+int::Parser Int
+int = (read . T.pack ) <$> (many1 digit) <?> "parsing int"
 
-instance PutText CmdError where
-    putText EmptyInput = putText ("Input is Empty"::Text)
-    putText (UnknownCommand txt) = mapM_ putText ["Unknown Command : ", txt]
-    putText (OtherError txt) = mapM_ putText ["CmdError : ", txt]
+optInt::Parser (Maybe Int)
+optInt = option Nothing (Just <$> int)
 
-type CmdErrorMonad = Either CmdError
+rest::Parser Text
+rest = T.pack <$> many1 anyToken
 
-parseAddCmd::[String] -> CmdErrorMonad Request
-parseAddCmd [] = throwError $ OtherError "No description for Add command"
-parseAddCmd lst@(x:xs) =
-    case readMaybe x of
-        Nothing -> return $ Add Nothing $ T.intercalate " " $ map T.pack lst
-        Just n     -> return $ Add (Just n)  $ T.intercalate " " $ map T.pack xs
+parseDelCmd = do
+    char 'd'
+    space
+    spaces
+    nums <-  int `sepBy1` spaces <?> "int list"
+    return $ Del nums
 
+parseAddCmd = do
+    char 'a'
+    space
+    spaces
+    taskId <- optInt
+    spaces
+    txt <- rest
+    return $ Add taskId txt
 
-parseArgs::[String] -> CmdErrorMonad Request
-parseArgs [] = return Empty
-parseArgs (x:xs) =
-   case x of
-        ['a'] -> parseAddCmd xs
-        ['d'] -> if null ints
-                         then throwError $ OtherError "No valid id's  for Del command"
-                         else return $ Del ints
-        otherwise -> throwError $ UnknownCommand $ T.pack x
-    where
-        ints = catMaybes $ map readMaybe xs
+argsParser = choice [parseAddCmd, parseDelCmd]
+
+parseArgs::Text -> Either  Text Request
+parseArgs input =
+    case (parse argsParser "cmd parser" input) of
+        Left err ->  Left $ T.pack $ show err
+        Right res -> return  res

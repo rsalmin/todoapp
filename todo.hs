@@ -1,14 +1,14 @@
 {-# LANGUAGE NoImplicitPrelude, DeriveGeneric, OverloadedStrings, OverloadedLabels, DeriveDataTypeable,  OverloadedStrings, FlexibleInstances#-}
 
-import BasePrelude hiding (on)
+import BasicPrelude hiding (on)
 import Database.Selda hiding (toText)
 import Database.Selda.PostgreSQL
 
+import Control.Exception
 import Control.Monad.Except
 
 import CmdArgs
 import Print
-import System.Environment
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
@@ -100,16 +100,16 @@ seldaErrorHandler :: SeldaError -> IO ()
 seldaErrorHandler  = print
 
 todoErrorHandler :: TodoError -> IO ()
-todoErrorHandler  (TodoError m) = m
+todoErrorHandler  (TodoError m) = m >> TIO.putStrLn T.empty
 
 main = main1 `catches` [Handler seldaErrorHandler, Handler todoErrorHandler]
 
 main1 :: IO ()
 main1 = do
     args <- getArgs
-    req <- case (parseArgs args) of
-        Left err -> (putText err) >> (return Empty)
-        Right r -> return r
+    req <- case (parseArgs $ T.intercalate " " args) of
+        Left err -> TIO.putStr "command error:" >> (putTextLn err) >> (return Empty)
+        Right r -> (putTextLn r) >> return r
     ensureTables
     case req of
         Empty -> return ()
