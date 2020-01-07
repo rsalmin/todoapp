@@ -13,9 +13,8 @@ import Text.Read (readMaybe)
 
 import Data.Time
 
-import Text.Parsec.Text
-import Text.Parsec hiding (Empty)
-import Text.Parsec.Error (errorMessages, messageString)
+import Parser
+import Control.Applicative hiding (many)
 
 data Request = Empty | Add (Maybe Int) Text | Del [Int] | Shedule Int (Maybe UTCTime) (Maybe UTCTime)
 
@@ -26,35 +25,27 @@ instance PutText Request where
    putText (Del ns) = putText ("Del "::Text) >> ( sequence_ $ intercalateM putSpace $ map putText ns )
    putText (Shedule n start stop) = sequence_ [putText ("Shedule "::Text), putText n, putText start, putText stop]
 
-int::Parser Int
-int = (read . T.pack ) <$> (many1 digit) <?> "parsing int"
 
-optInt::Parser (Maybe Int)
-optInt = option Nothing (Just <$> int)
+ints::Parser [Int]
+ints = sepBy int  spaces
 
-rest::Parser Text
-rest = T.pack <$> many1 anyToken
+parseDelCmd::Parser Request
+parseDelCmd  =
+    (\_ _  ns -> Del ns) <$> (char 'd') <*> spaces <*> ints
 
-parseDelCmd = do
-    char 'd'
-    space
-    spaces
-    nums <-  int `sepBy1` spaces <?> "int list"
-    return $ Del nums
+--parseAddCmd = do
+--    char 'a'
+--    space
+--    spaces
+--    taskId <- optInt
+--    spaces
+--    txt <- rest
+--    return $ Add taskId txt
 
-parseAddCmd = do
-    char 'a'
-    space
-    spaces
-    taskId <- optInt
-    spaces
-    txt <- rest
-    return $ Add taskId txt
-
-argsParser = choice [parseAddCmd, parseDelCmd]
+--argsParser = choice [parseAddCmd, parseDelCmd]
 
 parseArgs::Text -> Either  Text Request
 parseArgs input =
-    case (parse argsParser "cmd parser" input) of
-        Left err ->  Left $ T.pack $ show err
-        Right res -> return  res
+    case (parse parseDelCmd input) of
+        Nothing ->  Left $ T.pack $ "Nothing"
+        Just (res, _) -> return  res

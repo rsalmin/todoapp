@@ -118,5 +118,3 @@ main1 = do
 
     queryTable
 
-
-
