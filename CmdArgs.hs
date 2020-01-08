@@ -12,6 +12,7 @@ import Data.Maybe
 import Text.Read (readMaybe)
 
 import Data.Time
+import Data.Time.LocalTime
 
 import Parser
 import Control.Applicative hiding (many, optional)
@@ -51,7 +52,7 @@ parseSheduleCmd lt = do
        idx <-  int <?> "Expecting task index"
        spaces <?> "Missing time/date arguments from Shedule command"
        d <- day lt <?> "Expecting date"
-       return $ Shedule idx (Just d) Nothing
+       return $ Shedule idx (Just d) (Just $ addLocalTime nominalDay d)
 
 argsParser lt = anyOf [parseAddCmd, parseDelCmd, parseSheduleCmd lt]
 

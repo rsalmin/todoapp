@@ -14,6 +14,8 @@ import Data.Time.Format
 import Data.Time.LocalTime
 import Data.Time.Calendar
 
+import Control.Monad.Fail
+
 data ParserError = EmptyInput Text | ParserError Text
     deriving Show
 
@@ -43,6 +45,9 @@ instance Monad Parser where
         case parse p x of
             Left err -> Left err
             Right (a, xs) -> parse (f a) xs
+
+instance MonadFail Parser where
+    fail s = Parser $ \x -> Left $ ParserError $ T.pack s
 
 (<??>)::Parser a -> (ParserError -> ParserError)-> Parser a
 (<??>) p errf = Parser $ \x ->
@@ -150,9 +155,8 @@ word txt = Parser $ \x ->
 
 --TODO: Fix to Either monad
 day::LocalTime -> Parser LocalTime
-day defTime = do
-     dstr <- dayStr defTime
-     parseTimeM True defaultTimeLocale "%d %m %Y" dstr
+day defTime = dayStr defTime >>= (parseTimeM True defaultTimeLocale "%d %m %Y")
+
 
 intString = many digit
 show0 x = let s = show x in (if length s == 1 then "0" else "") ++ s

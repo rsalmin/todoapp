@@ -98,6 +98,15 @@ delEntry ns = withDB $ forM_ ns $
                deleteFrom_ todoTable (\entry -> entry ! #num .== nID)
                deleteFrom_ pchTable (\entry -> entry ! #parent .== nID .|| entry ! #child .== nID)
 
+sheduleEntry tz n start stop = withDB $ do
+    let startUTC = (localTimeToUTC tz) <$> start
+    let stopUTC = (localTimeToUTC tz) <$> stop
+    checkPK nID
+    update todoTable (\entry-> entry ! #num .== literal nID)
+        (\entry -> entry `with` [#startShedule := literal startUTC, #endShedule := literal stopUTC])
+    liftIO $ TIO.putStrLn "Shedule not implemented yet"
+    where
+       nID = toId n
 
 seldaErrorHandler :: SeldaError -> IO ()
 seldaErrorHandler  = print
@@ -110,7 +119,8 @@ main = main1 `catches` [Handler seldaErrorHandler, Handler todoErrorHandler]
 main1 :: IO ()
 main1 = do
     args <- getArgs
-    lt <- liftM2 utcToLocalTime getCurrentTimeZone getCurrentTime
+    tz <- getCurrentTimeZone
+    lt <- liftM (utcToLocalTime tz) getCurrentTime
     req <- case (parseArgs lt $ T.intercalate " " args) of
         Left err -> TIO.putStr "command error:  " >> (putTextLn err) >> (return Empty)
         Right r -> (putTextLn r) >> return r
@@ -119,7 +129,7 @@ main1 = do
         Empty -> return ()
         Add prnt dscr -> insertEntry prnt dscr
         Del  ns -> delEntry ns
-        Shedule idx ms me -> TIO.putStrLn "Shedule not implemented yet"
+        Shedule idx ms me -> sheduleEntry tz idx ms me
 
     queryTable
 
