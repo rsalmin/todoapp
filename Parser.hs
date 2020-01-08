@@ -7,24 +7,46 @@ import BasicPrelude
 import Control.Monad.Except
 import qualified Data.Text as T
 import Data.Char
+import PutText
 
-newtype Parser a = Parser {parse::Text -> Maybe (a, Text)}
+data ParserError = EmptyInput Text | ParserError Text
+
+
+newtype Parser a = Parser {parse::Text -> Either ParserError (a, Text)}
+
+instance PutText ParserError where
+    putText (EmptyInput txt) = putText $ T.append "Empty input. "  txt
+    putText (ParserError txt) = putText txt
 
 instance Functor Parser where
    fmap f p = Parser $ \x ->
        case parse p x of
-           Nothing -> Nothing
-           Just (a, txt) -> Just (f a, txt)
+           Left err -> Left err
+           Right (a, txt) -> Right $ first f (a, txt)
 
 instance Applicative Parser where
-   pure v = Parser $ \x -> Just (v, x)
+   pure v = Parser $ \x -> Right (v, x)
    p1 <*> p2 = Parser $ \x ->
        case parse p1 x of
-           Nothing -> Nothing
-           Just (f, x1) -> parse (f <$> p2) x1
+           Left err -> Left err
+           Right (f, x1) -> parse (f <$> p2) x1
 
-parseFail = Parser $ \x->Nothing
-parseAll  =  Parser $ \x->Just (x, "")
+--instance Monad Parser where
+--    return = pure
+--    p >>= f = Parser $ \x ->
+--        case parse p x of
+--            Left err -> Left err
+--            Right (a, xs) -> parse (f a) xs
+
+(<??>)::Parser a -> (ParserError -> ParserError)-> Parser a
+(<??>) p errf = Parser $ \x ->
+    case parse p x of
+        Left err -> Left $ errf err
+        Right r -> Right r
+
+(<?>) p txt = p <??> const (ParserError txt)
+
+parseAll  =  Parser $ \x->Right (x, "")
 
 int::Parser Int
 int = read . foldl1 T.append <$> (many (T.singleton <$> digit))
@@ -39,28 +61,53 @@ space::Parser Char
 space = anyOf [char ' ', char '\t']
 
 
+optional::Parser a -> Parser (Maybe a)
+optional p = Parser $ \x ->
+    case parse p x of
+       Left err -> Right (Nothing, x)
+       Right (a, b) -> Right (Just a, b)
+
 sepBy::Parser a -> Parser b -> Parser [a]
 sepBy p sep = Parser $ \x ->
     case parse p x of
-        Nothing -> Nothing
-        Just (a, b) -> case parse (many (sep *> p)) b of
-                                  Nothing -> Just ([a], b)
-                                  Just (as, rest) -> Just (a:as, rest)
+        Left err -> Left err
+        Right (a, b) -> case parse (many (sep *> p)) b of
+                                  Left _ -> Right ([a], b)
+                                  Right (as, rest) -> Right (a:as, rest)
 
 many::Parser a -> Parser [a]
 many p = Parser $ \x ->
    case parse p x of
-      Nothing -> Nothing
-      Just (a, b) -> case parse (many p) b of
-                                 Nothing -> Just ([a], b)
-                                 Just (as, rest) -> Just (a:as, rest)
+      Left err -> Left err
+      Right (a, b) -> case parse (many p) b of
+                                 Left _ -> Right ([a], b)
+                                 Right (as, rest) -> Right (a:as, rest)
+
+
+appendif::ParserError->ParserError->ParserError
+appendif err txt =
+    case (err, txt) of
+        (EmptyInput e, EmptyInput t) -> EmptyInput $ T.intercalate " or " [t, e]
+        (EmptyInput e, ParserError t) -> txt
+        (ParserError e, EmptyInput t) -> err
+        (ParserError e, ParserError t) -> ParserError $ T.intercalate " or " [t, e]
 
 anyOf::[Parser a] -> Parser a
-anyOf [] = parseFail
+anyOf [] = Parser $ \x -> Left $ EmptyInput ""
 anyOf (p:ps) = Parser $ \x ->
     case parse p x of
-        Nothing -> parse (anyOf ps) x
-        Just r -> Just r
+        Left err -> parse (anyOf ps <??>appendif err) x
+        Right r -> Right r
+
+
+eof::Parser ()
+eof = Parser $ \x -> if T.null x then Right ((), "") else Left $ ParserError "Expecting EOF"
+
+checknot::Parser a -> Parser ()
+checknot p = Parser $ \x->
+   case parse p x of
+       Left _ -> Right ((), x)
+       Right _ -> Left $ ParserError "checknot failed"
 
 char::Char -> Parser Char
 char c = Parser $ \x ->
@@ -68,18 +115,20 @@ char c = Parser $ \x ->
         ch = T.head x
     in
         if T.null x
-            then Nothing
+            then Left $ EmptyInput $ "expecting char " ++ tshow c
             else
                if ch == c
-                   then Just (ch, T.tail x)
-                   else Nothing
+                   then Right (ch, T.tail x)
+                   else Left $ ParserError $ "expecting char " ++ tshow c
 
 word::Text -> Parser Text
 word txt = Parser $ \x ->
    let
       (beg, rest) = T.splitAt (T.length txt) x
    in
-    if beg == txt
-        then  Just (beg, rest)
-        else   Nothing
+    if T.null x
+       then Left $ EmptyInput $ "expecting word " ++ txt
+       else if beg == txt
+           then  Right (beg, rest)
+           else   Left $ ParserError $ "expecting word " ++ txt
 

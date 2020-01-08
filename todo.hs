@@ -108,7 +108,7 @@ main1 :: IO ()
 main1 = do
     args <- getArgs
     req <- case (parseArgs $ T.intercalate " " args) of
-        Left err -> TIO.putStr "command error:" >> (putTextLn err) >> (return Empty)
+        Left err -> TIO.putStr "command error:  " >> (putTextLn err) >> (return Empty)
         Right r -> (putTextLn r) >> return r
     ensureTables
     case req of

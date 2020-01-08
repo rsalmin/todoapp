@@ -14,7 +14,7 @@ import Text.Read (readMaybe)
 import Data.Time
 
 import Parser
-import Control.Applicative hiding (many)
+import Control.Applicative hiding (many, optional)
 
 data Request = Empty | Add (Maybe Int) Text | Del [Int] | Shedule Int (Maybe UTCTime) (Maybe UTCTime)
 
@@ -31,21 +31,24 @@ ints = sepBy int  spaces
 
 parseDelCmd::Parser Request
 parseDelCmd  =
-    (\_ _  ns -> Del ns) <$> (char 'd') <*> spaces <*> ints
+    (\_ _  ns _ -> Del ns)
+       <$> (char 'd')  <?> "Expecting command d (Del)"
+       <*> spaces <?> "Command Del expected List of Ints"
+       <*> ints      <?> "Command Del Expected List of Ints"
+       <*> eof       <?> "Not Ints at the end of input"
 
---parseAddCmd = do
---    char 'a'
---    space
---    spaces
---    taskId <- optInt
---    spaces
---    txt <- rest
---    return $ Add taskId txt
+parseAddCmd =
+   (\_ _ idx _ txt -> Add idx txt)
+       <$> (char 'a') <?> "Expecting command a (Add)"
+       <*> spaces  <?> "Missing arguments to Add command"
+       <*> optional (int <* spaces)
+       <*> (checknot digit) <?> "Task description cannot starts with digit"
+       <*> parseAll
 
---argsParser = choice [parseAddCmd, parseDelCmd]
+argsParser = anyOf [parseAddCmd, parseDelCmd]
 
-parseArgs::Text -> Either  Text Request
+parseArgs::Text -> Either  ParserError Request
 parseArgs input =
-    case (parse parseDelCmd input) of
-        Nothing ->  Left $ T.pack $ "Nothing"
-        Just (res, _) -> return  res
+    case (parse argsParser input) of
+        Left err ->  Left err
+        Right (res, _) -> return  res
