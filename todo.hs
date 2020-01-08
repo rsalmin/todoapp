@@ -63,15 +63,16 @@ ensureTables = withDB $ do
     tryCreateTable todoTable
     tryCreateTable pchTable
 
-queryTable =  withDB $ do
+
+queryTable tz =  withDB $ do
   todoList <- query $ do
     entry <- select todoTable
-    return (entry ! #num :*: entry ! #description)
+    return (entry ! #num :*: entry ! #description :*: entry ! #startShedule :*:  entry ! #endShedule)
   links <- query $ do
     entry <- select pchTable
-    return (entry ! #parent :*: entry ! #child)
+    return (entry ! #parent :*: entry ! #child )
 
-  liftIO $ TIO.putStrLn $ showToDo todoList links
+  liftIO $ TIO.putStrLn $ showToDo tz todoList links
 
 checkPK pk = do
     nIDs <- query $ aggregate $ do
@@ -131,5 +132,5 @@ main1 = do
         Del  ns -> delEntry ns
         Shedule idx ms me -> sheduleEntry tz idx ms me
 
-    queryTable
+    queryTable tz
 
