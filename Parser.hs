@@ -9,7 +9,13 @@ import qualified Data.Text as T
 import Data.Char
 import PutText
 
+import Data.Time
+import Data.Time.Format
+import Data.Time.LocalTime
+import Data.Time.Calendar
+
 data ParserError = EmptyInput Text | ParserError Text
+    deriving Show
 
 
 newtype Parser a = Parser {parse::Text -> Either ParserError (a, Text)}
@@ -31,12 +37,12 @@ instance Applicative Parser where
            Left err -> Left err
            Right (f, x1) -> parse (f <$> p2) x1
 
---instance Monad Parser where
---    return = pure
---    p >>= f = Parser $ \x ->
---        case parse p x of
---            Left err -> Left err
---            Right (a, xs) -> parse (f a) xs
+instance Monad Parser where
+    return = pure
+    p >>= f = Parser $ \x ->
+        case parse p x of
+            Left err -> Left err
+            Right (a, xs) -> parse (f a) xs
 
 (<??>)::Parser a -> (ParserError -> ParserError)-> Parser a
 (<??>) p errf = Parser $ \x ->
@@ -49,7 +55,7 @@ instance Applicative Parser where
 parseAll  =  Parser $ \x->Right (x, "")
 
 int::Parser Int
-int = read . foldl1 T.append <$> (many (T.singleton <$> digit))
+int = (read . foldl1 T.append <$> (many (T.singleton <$> digit))) <?> "Expecting integer"
 
 digit::Parser Char
 digit = anyOf $ map (char . intToDigit) [0..9]
@@ -66,6 +72,12 @@ optional p = Parser $ \x ->
     case parse p x of
        Left err -> Right (Nothing, x)
        Right (a, b) -> Right (Just a, b)
+
+withDef::a -> Parser a -> Parser a
+withDef d p = Parser $ \x ->
+    case parse p x of
+        Left _ -> Right (d, x)
+        Right (a, b) -> Right (a, b)
 
 sepBy::Parser a -> Parser b -> Parser [a]
 sepBy p sep = Parser $ \x ->
@@ -109,6 +121,7 @@ checknot p = Parser $ \x->
        Left _ -> Right ((), x)
        Right _ -> Left $ ParserError "checknot failed"
 
+
 char::Char -> Parser Char
 char c = Parser $ \x ->
     let
@@ -132,3 +145,22 @@ word txt = Parser $ \x ->
            then  Right (beg, rest)
            else   Left $ ParserError $ "expecting word " ++ txt
 
+
+
+
+--TODO: Fix to Either monad
+day::LocalTime -> Parser LocalTime
+day defTime = do
+     dstr <- dayStr defTime
+     parseTimeM True defaultTimeLocale "%d %m %Y" dstr
+
+intString = many digit
+show0 x = let s = show x in (if length s == 1 then "0" else "") ++ s
+
+dayStr::LocalTime -> Parser String
+dayStr now = (\d m y -> intercalate " " [d, m, y])
+     <$> intString
+     <*> ( withDef (show0 defM) (char '.' *> intString) )
+     <*> ( withDef (show defY)  (char '.' *> intString) )
+    where
+      (defY, defM, defD) = toGregorian $ localDay now

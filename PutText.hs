@@ -45,4 +45,7 @@ instance (PutText a) => PutText (Maybe a) where
 instance PutText UTCTime where
     putText t = do
          zt <- utcToLocalZonedTime t
-         TIO.putStrLn $ T.pack $ formatTime defaultTimeLocale "%H:%M %d-%m-%y" t
+         TIO.putStr $ T.pack $ formatTime defaultTimeLocale "%H:%M %d-%m-%y" t
+
+instance PutText LocalTime where
+    putText = TIO.putStr . T.pack . formatTime defaultTimeLocale "%H:%M %d-%m-%y"

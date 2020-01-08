@@ -10,6 +10,9 @@ import Control.Monad.Except
 import CmdArgs
 import Print
 
+import Data.Time
+import Data.Time.LocalTime
+
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 
@@ -107,7 +110,8 @@ main = main1 `catches` [Handler seldaErrorHandler, Handler todoErrorHandler]
 main1 :: IO ()
 main1 = do
     args <- getArgs
-    req <- case (parseArgs $ T.intercalate " " args) of
+    lt <- liftM2 utcToLocalTime getCurrentTimeZone getCurrentTime
+    req <- case (parseArgs lt $ T.intercalate " " args) of
         Left err -> TIO.putStr "command error:  " >> (putTextLn err) >> (return Empty)
         Right r -> (putTextLn r) >> return r
     ensureTables
@@ -115,6 +119,7 @@ main1 = do
         Empty -> return ()
         Add prnt dscr -> insertEntry prnt dscr
         Del  ns -> delEntry ns
+        Shedule idx ms me -> TIO.putStrLn "Shedule not implemented yet"
 
     queryTable
 
