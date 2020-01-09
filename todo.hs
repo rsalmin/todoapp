@@ -105,6 +105,7 @@ sheduleEntry tz n start stop = withDB $ do
     checkPK nID
     update todoTable (\entry-> entry ! #num .== literal nID)
         (\entry -> entry `with` [#startShedule := literal startUTC, #endShedule := literal stopUTC])
+    return ()
     where
        nID = toId n
 

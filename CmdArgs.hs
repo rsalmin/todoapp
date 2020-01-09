@@ -87,7 +87,9 @@ parseSheduleStartEnd lt = do
 
 parseSheduleCmd lt = anyOf $ map ($ lt) [parseSheduleStartEnd, parseSheduleStart, parseSheduleEnd, parseSheduleDay]
 
-argsParser lt = anyOf [parseAddCmd, parseDelCmd, parseSheduleCmd lt]
+parseEmptyCmd  = eof >> ( return $ Empty)
+
+argsParser lt = anyOf [parseAddCmd, parseDelCmd, parseSheduleCmd lt, parseEmptyCmd]
 
 parseArgs::LocalTime -> Text -> Either  ParserError Request
 parseArgs lt input =
