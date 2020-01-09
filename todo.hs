@@ -105,7 +105,6 @@ sheduleEntry tz n start stop = withDB $ do
     checkPK nID
     update todoTable (\entry-> entry ! #num .== literal nID)
         (\entry -> entry `with` [#startShedule := literal startUTC, #endShedule := literal stopUTC])
-    liftIO $ TIO.putStrLn "Shedule not implemented yet"
     where
        nID = toId n
 

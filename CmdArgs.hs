@@ -46,13 +46,46 @@ parseAddCmd =
        <*> (checknot digit) <?> "Task description cannot starts with digit"
        <*> parseAll
 
-parseSheduleCmd lt = do
+parseSheduleDay lt = do
        (char 's') <?> "Expecting command s (Shedule)"
        spaces  <?> "Missing arguments to Shedule command"
        idx <-  int <?> "Expecting task index"
        spaces <?> "Missing time/date arguments from Shedule command"
        d <- day lt <?> "Expecting date"
        return $ Shedule idx (Just d) (Just $ addLocalTime nominalDay d)
+
+parseSheduleStart lt = do
+       (char 's') <?> "Expecting command s (Shedule)"
+       spaces  <?> "Missing arguments to Shedule command"
+       idx <-  int <?> "Expecting task index"
+       spaces <?> "Missing time/date arguments from Shedule command"
+       d <- timeDay lt <?> "Expecting time and date"
+       return $ Shedule idx (Just d) Nothing
+
+parseSheduleEnd lt = do
+       (char 's') <?> "Expecting command s (Shedule)"
+       spaces  <?> "Missing arguments to Shedule command"
+       idx <-  int <?> "Expecting task index"
+       spaces <?> "Missing time/date arguments from Shedule command"
+       (char '-') <?> "Missing '-' start - end shedule delimeter"
+       spaces <?> "Missing end shedule time date"
+       d <- timeDay lt <?> "Expecting time and date"
+       return $ Shedule idx Nothing (Just d)
+
+parseSheduleStartEnd lt = do
+       (char 's') <?> "Expecting command s (Shedule)"
+       spaces  <?> "Missing arguments to Shedule command"
+       idx <-  int <?> "Expecting task index"
+       spaces <?> "Missing time/date arguments from Shedule command"
+       start <- timeDay lt <?> "Expecting time and date"
+       spaces <?> "Do you want to specify end time date?"
+       (char '-') <?> "Missing '-' start - end shedule delimeter"
+       spaces <?> "Missing end shedule time date"
+       end <- timeDay lt <?> "Expecting time and date"
+       return $ Shedule idx (Just start) (Just end)
+
+
+parseSheduleCmd lt = anyOf $ map ($ lt) [parseSheduleStartEnd, parseSheduleStart, parseSheduleEnd, parseSheduleDay]
 
 argsParser lt = anyOf [parseAddCmd, parseDelCmd, parseSheduleCmd lt]
 

@@ -1,6 +1,22 @@
 {-# LANGUAGE OverloadedStrings, NoImplicitPrelude #-}
 module Parser
-
+(
+  ParserError(..),
+  Parser(..),
+  day,
+  timeDay,
+  int,
+  sepBy,
+  char,
+  spaces,
+  anyOf,
+  (<?>),
+  eof,
+  optional,
+  checknot,
+  digit,
+  parseAll
+)
 where
 
 import BasicPrelude
@@ -151,20 +167,30 @@ word txt = Parser $ \x ->
            else   Left $ ParserError $ "expecting word " ++ txt
 
 
+timeDay::LocalTime -> Parser LocalTime
+timeDay defTime = timeDayStr defTime >>= (parseTimeM True defaultTimeLocale "%H:%M %d %m %Y")
 
 
---TODO: Fix to Either monad
+timeDayStr::LocalTime -> Parser String
+timeDayStr lt = (\t d -> intercalate " " [t, d]) <$> timeStr <*> (char ' ' *> (dayStr lt))
+
+timeStr::Parser String
+timeStr = (\h m -> intercalate ":" [prep0 h, prep0 m])
+    <$> intString
+    <*> (char ':' *> intString)
+
 day::LocalTime -> Parser LocalTime
 day defTime = dayStr defTime >>= (parseTimeM True defaultTimeLocale "%d %m %Y")
 
 
 intString = many digit
-show0 x = let s = show x in (if length s == 1 then "0" else "") ++ s
+
+prep0 x =(if length x == 1 then "0" else "") ++ x
 
 dayStr::LocalTime -> Parser String
-dayStr now = (\d m y -> intercalate " " [d, m, y])
+dayStr now = (\d m y -> intercalate " " [prep0 d, prep0 m, y])
      <$> intString
-     <*> ( withDef (show0 defM) (char '.' *> intString) )
+     <*> ( withDef (show defM) (char '.' *> intString) )
      <*> ( withDef (show defY)  (char '.' *> intString) )
     where
       (defY, defM, defD) = toGregorian $ localDay now

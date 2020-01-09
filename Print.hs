@@ -47,18 +47,22 @@ showTop tz xs links level (idx :*: dscr :*: start :*: stop)  =
         tstr = (T.pack $ show idx, showShedule startLocal stopLocal, T.append (spaces (4*level)) dscr)
 
 showMLT::Maybe LocalTime -> Text
-showMLT Nothing = spaces 10
-showMLT (Just lt) = T.pack $ formatTime defaultTimeLocale "%d.%m.%Y" lt
+showMLT Nothing = ""
+showMLT (Just lt) = T.pack $ formatTime defaultTimeLocale "day %d.%m.%Y" lt
+
+showMLTT::Maybe LocalTime -> Text
+showMLTT Nothing = ""
+showMLTT (Just lt) = T.pack $ formatTime defaultTimeLocale "%H:%M %d.%m.%Y" lt
 
 showShedule::Maybe LocalTime -> Maybe LocalTime -> Text
 showShedule start stop =
     case (start, stop) of
         (Nothing, Nothing) -> ""
-        (Just s, Nothing)      -> T.concat [showMLT start, " - ", showMLT stop]
-        (Nothing, Just s)      -> T.concat [showMLT start, " - ", showMLT stop]
+        (Just s, Nothing)      -> T.concat [showMLTT start, " -  till end"]
+        (Nothing, Just s)      -> T.concat ["from start - ", showMLTT stop]
         (Just s, Just e)          -> if oneDay s e
                                                     then showMLT start
-                                                    else T.concat [showMLT start, " - ", showMLT stop]
+                                                    else T.concat [showMLTT start, " - ", showMLTT stop]
 
 --Check if shedule time is exactly one day from 00:00
 oneDay::LocalTime -> LocalTime -> Bool
