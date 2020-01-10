@@ -46,18 +46,18 @@ to schedule task 5 to specific time day
 
 
 you can omit start or end time (keeping `-` for end-time although) to schedule
-
 a task without start or end time.
 
 
 you can omit year or month if you expect a current year or current month
 
 
-you can use the shorter form if you schedule in your schedule time in one day
+you can use the shorter form if you schedule in your schedule time is one day
 
 
   `./todo s 5 10:00-18:00 25.09.1977`
 
+Only numeric input of dates are supported.
 
 That's all for now. The database scheme can be changed in future versions.
 
