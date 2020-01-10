@@ -46,37 +46,34 @@ parseAddCmd =
        <*> (checknot digit) <?> "Task description cannot starts with digit"
        <*> parseAll
 
-parseSheduleDay lt = do
+
+parseSheduleBegin::Parser Int
+parseSheduleBegin = do
        (char 's') <?> "Expecting command s (Shedule)"
        spaces  <?> "Missing arguments to Shedule command"
        idx <-  int <?> "Expecting task index"
        spaces <?> "Missing time/date arguments from Shedule command"
+       return idx
+
+parseSheduleDay lt = do
+       idx <- parseSheduleBegin
        d <- day lt <?> "Expecting date"
        return $ Shedule idx (Just d) (Just $ addLocalTime nominalDay d)
 
 parseSheduleStart lt = do
-       (char 's') <?> "Expecting command s (Shedule)"
-       spaces  <?> "Missing arguments to Shedule command"
-       idx <-  int <?> "Expecting task index"
-       spaces <?> "Missing time/date arguments from Shedule command"
+       idx <-  parseSheduleBegin
        d <- timeDay lt <?> "Expecting time and date"
        return $ Shedule idx (Just d) Nothing
 
 parseSheduleEnd lt = do
-       (char 's') <?> "Expecting command s (Shedule)"
-       spaces  <?> "Missing arguments to Shedule command"
-       idx <-  int <?> "Expecting task index"
-       spaces <?> "Missing time/date arguments from Shedule command"
+       idx <-  parseSheduleBegin
        (char '-') <?> "Missing '-' start - end shedule delimeter"
        spaces <?> "Missing end shedule time date"
        d <- timeDay lt <?> "Expecting time and date"
        return $ Shedule idx Nothing (Just d)
 
 parseSheduleStartEnd lt = do
-       (char 's') <?> "Expecting command s (Shedule)"
-       spaces  <?> "Missing arguments to Shedule command"
-       idx <-  int <?> "Expecting task index"
-       spaces <?> "Missing time/date arguments from Shedule command"
+       idx <-  parseSheduleBegin
        start <- timeDay lt <?> "Expecting time and date"
        spaces <?> "Do you want to specify end time date?"
        (char '-') <?> "Missing '-' start - end shedule delimeter"
@@ -84,8 +81,16 @@ parseSheduleStartEnd lt = do
        end <- timeDay lt <?> "Expecting time and date"
        return $ Shedule idx (Just start) (Just end)
 
+parseSheduleStartEndTime lt = do
+       idx <-  parseSheduleBegin
+       startTime <- time
+       optional spaces <?> "Do you want to specify end time date?"
+       (char '-') <?> "Missing '-' start - end shedule delimeter"
+       optional spaces <?> "Missing end shedule time date"
+       end <- timeDay lt <?> "Expecting time and date"
+       return $ Shedule idx (Just $ end {localTimeOfDay = startTime}) (Just end)
 
-parseSheduleCmd lt = anyOf $ map ($ lt) [parseSheduleStartEnd, parseSheduleStart, parseSheduleEnd, parseSheduleDay]
+parseSheduleCmd lt = (anyOf $ map ($ lt) [parseSheduleStartEndTime, parseSheduleStartEnd, parseSheduleStart, parseSheduleEnd, parseSheduleDay]) <* eof
 
 parseEmptyCmd  = eof >> ( return $ Empty)
 

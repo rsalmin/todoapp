@@ -54,15 +54,28 @@ showMLTT::Maybe LocalTime -> Text
 showMLTT Nothing = ""
 showMLTT (Just lt) = T.pack $ formatTime defaultTimeLocale "%H:%M %d.%m.%Y" lt
 
+showT::LocalTime -> Text
+showT lt = T.pack $ formatTime defaultTimeLocale "%H:%M" lt
+
+showD::LocalTime -> Text
+showD lt = T.pack $ formatTime defaultTimeLocale "%d.%m.%Y" lt
+
+
 showShedule::Maybe LocalTime -> Maybe LocalTime -> Text
 showShedule start stop =
     case (start, stop) of
         (Nothing, Nothing) -> ""
         (Just s, Nothing)      -> T.concat [showMLTT start, " -  till end"]
         (Nothing, Just s)      -> T.concat ["from start - ", showMLTT stop]
-        (Just s, Just e)          -> if oneDay s e
-                                                    then showMLT start
-                                                    else T.concat [showMLTT start, " - ", showMLTT stop]
+        (Just s, Just e)          -> showSheduleInterval s e
+
+showSheduleInterval::LocalTime -> LocalTime -> Text
+showSheduleInterval s e =
+    if oneDay s e
+        then showMLT (Just s)
+        else if (localDay s) == (localDay e)
+                    then T.concat [showT s, "-", showMLTT (Just e)]
+                    else T.concat [showMLTT (Just s), " - ", showMLTT (Just e)]
 
 --Check if shedule time is exactly one day from 00:00
 oneDay::LocalTime -> LocalTime -> Bool

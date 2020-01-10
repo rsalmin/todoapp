@@ -4,6 +4,7 @@ module Parser
   ParserError(..),
   Parser(..),
   day,
+  time,
   timeDay,
   int,
   sepBy,
@@ -171,8 +172,12 @@ timeDay::LocalTime -> Parser LocalTime
 timeDay defTime = timeDayStr defTime >>= (parseTimeM True defaultTimeLocale "%H:%M %d %m %Y")
 
 
+
 timeDayStr::LocalTime -> Parser String
 timeDayStr lt = (\t d -> intercalate " " [t, d]) <$> timeStr <*> (char ' ' *> (dayStr lt))
+
+time::Parser TimeOfDay
+time = timeStr >>= (parseTimeM True defaultTimeLocale "%H:%M")
 
 timeStr::Parser String
 timeStr = (\h m -> intercalate ":" [prep0 h, prep0 m])
